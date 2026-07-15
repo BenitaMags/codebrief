@@ -1,7 +1,7 @@
 import express from "express";
+import { setupConstraints } from "./db/neo4j.js";
 
 const app = express();
-const port = process.env.BACKEND_PORT ? 4000 : 4000; // always listen on 4000 inside container
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -11,6 +11,14 @@ app.get("/health", (_req, res) => {
   });
 });
 
-app.listen(4000, () => {
-  console.log(`[backend] listening on port 4000`);
+async function start() {
+  await setupConstraints();
+  app.listen(4000, () => {
+    console.log(`[backend] listening on port 4000`);
+  });
+}
+
+start().catch((err) => {
+  console.error("[backend] failed to start:", err);
+  process.exit(1);
 });
