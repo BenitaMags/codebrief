@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head><title>SSE Test</title></head>
+<body>
+  <h1>Agent Status Stream</h1>
+  <pre id="log"></pre>
+  <script>
+    const repoId = new URLSearchParams(location.search).get("repoId");
+    const log = document.getElementById("log");
+    const source = new EventSource(`http://localhost:4000/repos/${repoId}/status-stream`);
+    source.addEventListener("connected", (e) => log.textContent += `[connected] ${e.data}\n`);
+    source.addEventListener("status", (e) => log.textContent += `[status] ${e.data}\n`);
+    source.onerror = (e) => log.textContent += `[error] connection issue\n`;
+  </script>
+</body>
+</html>

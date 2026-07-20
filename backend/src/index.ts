@@ -1,5 +1,6 @@
 import express from "express";
 import { setupConstraints } from "./db/neo4j.js";
+import sseRoutes from "./api/routes/sse.routes.js";
 
 const app = express();
 
@@ -22,3 +23,5 @@ start().catch((err) => {
   console.error("[backend] failed to start:", err);
   process.exit(1);
 });
+
+app.use("/repos", sseRoutes);

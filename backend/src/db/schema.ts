@@ -59,7 +59,7 @@ export const summaries = pgTable(
       .notNull(),
     overview: text("overview").notNull(), // one-paragraph summary
     keyPoints: jsonb("key_points").notNull(), // array of 3 bullet strings
-    embedding: vector("embedding", { dimensions: 1536 }), // text-embedding-3-small = 1536 dims
+    embedding: vector("embedding", { dimensions: 768 }), // nomic-embed-text (local, Ollama) — was 1536 for OpenAI text-embedding-3-small
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
