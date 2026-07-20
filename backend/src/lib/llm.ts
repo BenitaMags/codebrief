@@ -13,27 +13,43 @@ export const SUMMARIZER_LOCAL_MODEL = "qwen2.5-coder:3b"; // free, local, zero-c
  * running in its own container — no API key, no billing, fully self-hosted.
  * Slower on CPU than a hosted API, but $0 regardless of volume.
  */
-export async function callOllama(model: string, systemPrompt: string, userPrompt: string): Promise<string> {
-  const res = await fetch("http://ollama:11434/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      stream: false,
-    }),
-    signal: AbortSignal.timeout(300_000), // 5 min — CPU inference on larger inputs can be slow
-  });
+const OLLAMA_MAX_RETRIES = 2;
 
-  if (!res.ok) {
-    throw new Error(`[llm] Ollama request failed: ${res.status} ${res.statusText}`);
+export async function callOllama(model: string, systemPrompt: string, userPrompt: string): Promise<string> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 1; attempt <= OLLAMA_MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch("http://ollama:11434/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(300_000),
+      });
+
+      if (!res.ok) {
+        throw new Error(`[llm] Ollama request failed: ${res.status} ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      return data.message?.content ?? "";
+    } catch (err) {
+      lastError = err as Error;
+      console.warn(`[llm] Ollama call attempt ${attempt}/${OLLAMA_MAX_RETRIES} failed: ${lastError.message}`);
+      if (attempt < OLLAMA_MAX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, 5000)); // give the llama-server subprocess time to recover/reload
+      }
+    }
   }
 
-  const data = await res.json();
-  return data.message?.content ?? "";
+  throw new Error(`[llm] Ollama call failed after ${OLLAMA_MAX_RETRIES} attempts: ${lastError?.message}`);
 }
 
 export async function callClaude(model: string, systemPrompt: string, userPrompt: string): Promise<string> {

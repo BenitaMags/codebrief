@@ -16,7 +16,10 @@
   "test:summarizer": "tsx src/scripts/test-summarizer.ts",
   "test:chunking": "tsx src/scripts/test-chunking.ts",
   "test:queue": "tsx src/scripts/test-queue.ts",
-  "test:sse-synthetic": "tsx src/scripts/test-sse-synthetic.ts"
+  "test:sse-synthetic": "tsx src/scripts/test-sse-synthetic.ts",
+  "test:prioritizer": "tsx src/scripts/test-prioritizer.ts",
+  "test:guide": "tsx src/scripts/test-guide.ts",
+  "test:guide-setup": "tsx src/scripts/test-guide-setup.ts"
 },
 "dependencies": {
   "express": "^4.19.2",

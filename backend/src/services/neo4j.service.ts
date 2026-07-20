@@ -70,3 +70,32 @@ export async function getRepoGraph(repoId: string) {
     await session.close();
   }
 }
+
+export interface FileRanking {
+  path: string;
+  dependentCount: number;
+}
+
+/**
+ * Ranks every File node in a repo by in-degree — how many other files
+ * import it. Higher dependentCount = more foundational to the codebase,
+ * since understanding this file helps understand everything that relies on it.
+ */
+export async function getFileRankings(repoId: string): Promise<FileRanking[]> {
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `MATCH (f:File {repoId: $repoId})
+       OPTIONAL MATCH (dependent:File {repoId: $repoId})-[:IMPORTS]->(f)
+       RETURN f.path AS path, count(dependent) AS dependentCount
+       ORDER BY dependentCount DESC, f.path ASC`,
+      { repoId }
+    );
+    return result.records.map((r) => ({
+      path: r.get("path"),
+      dependentCount: r.get("dependentCount").toNumber(), // Neo4j returns a Neo4j Integer, not a plain JS number
+    }));
+  } finally {
+    await session.close();
+  }
+}

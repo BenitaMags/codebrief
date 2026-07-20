@@ -15,6 +15,13 @@
       "when": 1784258154033,
       "tag": "0001_deep_doctor_faustus",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784566747638,
+      "tag": "0002_omniscient_pyro",
+      "breakpoints": true
     }
   ]
 }

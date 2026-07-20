@@ -66,3 +66,16 @@ export const summaries = pgTable(
     fileIdIdx: index("summaries_file_id_idx").on(table.fileId),
   })
 );
+
+export const guides = pgTable("guides", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  repoId: uuid("repo_id")
+    .references(() => repos.id, { onDelete: "cascade" })
+    .notNull(),
+  overview: text("overview").notNull(),
+  architectureSummary: text("architecture_summary").notNull(),
+  entryPoints: jsonb("entry_points").notNull(), // array of file path strings
+  commonTasksGuidance: text("common_tasks_guidance").notNull(),
+  quickStart: text("quick_start").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
