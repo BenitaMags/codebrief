@@ -9,6 +9,8 @@ import { runSummarizerAgent } from "../agents/summarizer.agent.js";
 import type { AnalyzeJobData } from "../queue/analyze.queue.js";
 import { publishProgress } from "../services/progress.service.js";
 
+const connection = { url: env.redisUrl };
+
 async function processAnalyzeJob(job: Job<AnalyzeJobData>) {
   const { repoId, owner, name, branch } = job.data;
   console.log(`[worker] Starting analysis for ${owner}/${name} (repoId: ${repoId})`);
@@ -65,3 +67,4 @@ analyzeWorker.on("failed", (job, err) => {
 });
 
 console.log("[worker] Listening for analyze-repo jobs...");
+
