@@ -6,6 +6,7 @@ import repoRoutes from "./api/routes/repo.routes.js";
 import graphRoutes from "./api/routes/graph.routes.js";
 import readingRoutes from "./api/routes/reading.routes.js";
 import guideRoutes from "./api/routes/guide.routes.js";
+import chatRoutes from "./api/routes/chat.routes.js";
 
 const app = express();
 
@@ -37,3 +38,5 @@ start().catch((err) => {
   console.error("[backend] failed to start:", err);
   process.exit(1);
 });
+
+app.use("/repos", chatRoutes);

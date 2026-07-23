@@ -19,7 +19,8 @@
   "test:sse-synthetic": "tsx src/scripts/test-sse-synthetic.ts",
   "test:prioritizer": "tsx src/scripts/test-prioritizer.ts",
   "test:guide": "tsx src/scripts/test-guide.ts",
-  "test:guide-setup": "tsx src/scripts/test-guide-setup.ts"
+  "test:guide-setup": "tsx src/scripts/test-guide-setup.ts",
+  "test:rag": "tsx src/scripts/test-rag.ts"
 },
 "dependencies": {
   "express": "^4.19.2",
