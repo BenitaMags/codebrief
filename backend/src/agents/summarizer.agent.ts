@@ -9,29 +9,48 @@ import type { GithubFile } from "../services/github.service.js";
 
 const MAX_LINES_BEFORE_CHUNKING = 500;
 const CHUNK_SIZE_LINES = 400; // per-chunk size when a file exceeds the threshold
+const MAX_FILE_BYTES_FOR_LOCAL_MODEL = 50_000; // ~50KB — files bigger than this are too expensive for CPU-only inference
 
 // Files we never summarize, regardless of extension checks elsewhere —
 // lock files and binaries carry no useful "what does this code do" signal.
+
 const SKIP_FILENAMES = new Set([
   "package-lock.json",
   "yarn.lock",
   "pnpm-lock.yaml",
   "Cargo.lock",
   "poetry.lock",
+  "Pipfile.lock",
+  "composer.lock",
+  "Gemfile.lock",
+  ".DS_Store",
+  "Thumbs.db",
 ]);
+
+const SKIP_DIR_PATTERNS = [
+  /\.egg-info\//,
+  /axiom_logs\//,
+  /__pycache__\//,
+  /\.pytest_cache\//,
+  /\.tox\//,
+  /\.mypy_cache\//,
+];
 
 const BINARY_EXTENSIONS = [
   ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".woff", ".woff2",
-  ".ttf", ".eot", ".pdf", ".zip", ".tar", ".gz",
+  ".ttf", ".eot", ".pdf", ".zip", ".tar", ".gz", ".bz2", ".7z",
+  ".exe", ".dll", ".so", ".dylib", ".pyc", ".pyo", ".class",
+  ".o", ".obj", ".wasm", ".map",
 ];
 
 export function shouldSkipFile(filePath: string): boolean {
   const filename = path.basename(filePath);
   if (SKIP_FILENAMES.has(filename)) return true;
   if (BINARY_EXTENSIONS.some((ext) => filePath.endsWith(ext))) return true;
-  if (filePath.includes(".egg-info/")) return true; // Python build artifact noise, per Step 3 note
+  if (SKIP_DIR_PATTERNS.some((pattern) => pattern.test(filePath))) return true;
   return false;
 }
+
 
 interface SummaryResult {
   overview: string;
@@ -119,11 +138,24 @@ export async function summarizeAndStoreFile(
     result = cachedResult;
   } else {
     const lineCount = content.split("\n").length;
+    let summary: SummaryResult;
 
-    const summary =
-      lineCount > MAX_LINES_BEFORE_CHUNKING
-        ? await summarizeChunkedFile(filePath, content)
-        : await summarizeWholeFile(filePath, content);
+    if (content.length > MAX_FILE_BYTES_FOR_LOCAL_MODEL) {
+      console.log(`[summarizer] ${filePath} is ${content.length} bytes — too large for local model, using metadata summary`);
+      const extension = path.extname(filePath);
+      summary = {
+        overview: `${filePath} is a ${lineCount}-line ${extension || "text"} file. It was too large to summarize with the current local model and should be reviewed manually for detailed understanding.`,
+        keyPoints: [
+          `File size: ${lineCount} lines, ${content.length} bytes`,
+          `Language: ${extension || "unknown"}`,
+          "Skipped by auto-summarizer due to size — review manually for details",
+        ],
+      };
+    } else if (lineCount > MAX_LINES_BEFORE_CHUNKING) {
+      summary = await summarizeChunkedFile(filePath, content);
+    } else {
+      summary = await summarizeWholeFile(filePath, content);
+    }
 
     const embedding = await generateEmbedding(summary.overview);
 
@@ -163,13 +195,29 @@ export async function runSummarizerAgent(
       continue;
     }
 
-    const wasCached = await getCachedSummary(owner, name, file.path, file.sha);
+    const cachedResult = await getCachedSummary(owner, name, file.path, file.sha);
+
+    if (cachedResult) {
+      const [fileRow] = await db
+        .insert(filesTable)
+        .values({ repoId, path: file.path })
+        .returning();
+
+      await db.insert(summariesTable).values({
+        fileId: fileRow.id,
+        overview: cachedResult.overview,
+        keyPoints: cachedResult.keyPoints,
+        embedding: cachedResult.embedding,
+      });
+
+      cached++;
+      continue;
+    }
+
+    // Cache miss — fetch content and run the full summarize + embed + store pipeline
     const content = await fetchFileContent(owner, name, branch, file.path);
-
     await summarizeAndStoreFile(repoId, owner, name, file.path, content, file.sha);
-
-    if (wasCached) cached++;
-    else summarized++;
+    summarized++;
   }
 
   console.log(`[summarizer] Done. Summarized: ${summarized}, Cached: ${cached}, Skipped: ${skipped}`);

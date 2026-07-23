@@ -77,6 +77,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ollama:
+        condition: service_healthy
     command: npm run dev
 
   worker:
@@ -94,7 +96,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: npm run worker:dev   # placeholder script for now — real worker comes in Step 7
+      ollama:
+        condition: service_healthy
+    command: npm run worker:dev
 
   frontend:
     build:

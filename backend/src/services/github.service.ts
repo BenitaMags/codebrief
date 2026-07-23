@@ -83,6 +83,16 @@ export async function fetchFileTree(
     /(^|\/)build\//,
     /(^|\/)\.next\//,
     /(^|\/)vendor\//,
+    /(^|\/)\.egg-info\//,
+    /(^|\/)__pycache__\//,
+    /(^|\/)\.pytest_cache\//,
+    /(^|\/)\.tox\//,
+    /(^|\/)\.venv\//,
+    /(^|\/)venv\//,
+    /(^|\/)\.mypy_cache\//,
+    /(^|\/)\.coverage\//,
+    /(^|\/)htmlcov\//,
+    /(^|\/)\.eggs\//,
   ];
 
   return data.tree
