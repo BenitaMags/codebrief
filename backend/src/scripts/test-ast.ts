@@ -1,7 +1,7 @@
 import { parseGithubUrl, fetchDefaultBranch, fetchFileTree, fetchFileContent } from "../services/github.service.js";
-import { extractImports } from "../lib/ast.js";
+import { extractImports, ImportEdge } from "../lib/ast.js";
 
-const JS_TS_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx"];
+const PARSEABLE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".py"];
 
 async function main() {
   const repoUrl = process.argv[2];
@@ -14,27 +14,22 @@ async function main() {
   const branch = await fetchDefaultBranch(owner, name);
   const files = await fetchFileTree(owner, name, branch);
 
-  const jsFiles = files.filter((f) => JS_TS_EXTENSIONS.some((ext) => f.path.endsWith(ext)));
-  console.log(`[test] Found ${jsFiles.length} JS/TS files out of ${files.length} total\n`);
+  const parseableFiles = files.filter((f) => PARSEABLE_EXTENSIONS.some((ext) => f.path.endsWith(ext)));
+  console.log(`[test] Found ${parseableFiles.length} parseable files out of ${files.length} total\n`);
 
-  if (jsFiles.length === 0) {
-    console.log("[test] No JS/TS files found in this repo — nothing to parse. Try a JS/TS repo instead.");
+  if (parseableFiles.length === 0) {
+    console.log("[test] No parseable files found in this repo.");
     return;
   }
 
   let totalEdges = 0;
-  let failedFiles = 0;
 
-  for (const file of jsFiles.slice(0, 15)) { // cap at 15 files for a quick console-readable test
+  for (const file of parseableFiles.slice(0, 15)) {
     const content = await fetchFileContent(owner, name, branch, file.path);
     const edges = extractImports(file.path, content);
 
-    if (edges.length === 0 && content.trim().length > 0) {
-      // Could be a genuinely import-free file, or a silent parse failure — worth eyeballing
-    }
-
     console.log(`[test] ${file.path} → ${edges.length} import(s)`);
-    edges.forEach((e) =>
+    edges.forEach((e: ImportEdge) =>
       console.log(`    - "${e.importedPath}" ${e.isRelative ? "(relative)" : "(package)"}`)
     );
     totalEdges += edges.length;

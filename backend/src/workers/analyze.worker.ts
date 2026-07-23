@@ -4,12 +4,13 @@ import { env } from "../config/env.js";
 import { db } from "../db/postgres.js";
 import { repos as reposTable } from "../db/schema.js";
 import { fetchFileTree } from "../services/github.service.js";
-import { runCartographerAgent } from "../agents/cartographer.agent.js";
-import { runSummarizerAgent } from "../agents/summarizer.agent.js";
 import type { AnalyzeJobData } from "../queue/analyze.queue.js";
 import { publishProgress } from "../services/progress.service.js";
+import { runAnalysisPipeline } from "../agents/orchestrator.js";
 
 const connection = { url: env.redisUrl };
+
+
 
 async function processAnalyzeJob(job: Job<AnalyzeJobData>) {
   const { repoId, owner, name, branch } = job.data;
@@ -20,20 +21,9 @@ async function processAnalyzeJob(job: Job<AnalyzeJobData>) {
 
   try {
     const files = await fetchFileTree(owner, name, branch);
-    await job.updateProgress(20);
-    await publishProgress(repoId, "status", { stage: "cartographer", message: `Mapping ${files.length} files...` });
+    await job.updateProgress(10);
 
-    console.log(`[worker] Running Cartographer Agent...`);
-    const cartographerResult = await runCartographerAgent(repoId, owner, name, branch, files);
-    await job.updateProgress(60);
-    await publishProgress(repoId, "status", {
-      stage: "cartographer_done",
-      message: `Cartographer done: ${cartographerResult.nodesCreated} files, ${cartographerResult.edgesCreated} edges`,
-    });
-
-    console.log(`[worker] Running Summarizer Agent...`);
-    await publishProgress(repoId, "status", { stage: "summarizer", message: `Summarizing files...` });
-    const summarizerResult = await runSummarizerAgent(repoId, owner, name, branch, files);
+    const result = await runAnalysisPipeline({ repoId, owner, name, branch, files });
     await job.updateProgress(100);
 
     await db
@@ -41,10 +31,15 @@ async function processAnalyzeJob(job: Job<AnalyzeJobData>) {
       .set({ status: "ready", fileCount: files.length, updatedAt: new Date() })
       .where(eq(reposTable.id, repoId));
 
-    await publishProgress(repoId, "status", { stage: "ready", message: `Analysis complete!` });
+    await publishProgress(repoId, "status", { stage: "ready", message: "Analysis complete!" });
 
-    console.log(`[worker] Done. Cartographer:`, cartographerResult, `Summarizer:`, summarizerResult);
-    return { cartographerResult, summarizerResult };
+    console.log(`[worker] Done.`, {
+      cartographer: result.cartographerResult,
+      summarizer: result.summarizerResult,
+      prioritizer: result.prioritizerResult ? "ranked" : null,
+      guide: result.guideResult ? "generated" : null,
+    });
+    return result;
   } catch (err) {
     await db.update(reposTable).set({ status: "failed" }).where(eq(reposTable.id, repoId));
     await publishProgress(repoId, "status", { stage: "failed", message: `Analysis failed: ${(err as Error).message}` });
